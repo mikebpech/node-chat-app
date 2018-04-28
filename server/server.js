@@ -5,6 +5,7 @@ const socketIO = require('socket.io');
 const chalk = require('chalk');
 
 const { generateMessage, generateLocationMessage } = require('./utils/message');
+const { isRealString } = require('./utils/validation');
 const publicPath = path.join(__dirname, '../public');
 const port = process.env.PORT || 3000;
 const app = express();
@@ -16,9 +17,18 @@ app.use(express.static(publicPath));
 io.on('connection', (socket) => {
     console.log(chalk.blue('New user connected'));
 
-    socket.emit('newMessage', generateMessage('Server', 'Welcome to the chat app.'));
+    socket.on('join', (params, callback) => {
+        if (!isRealString(params.name) || !isRealString(params.room)) {
+            callback('Name and room name are required.');
+        };
 
-    socket.broadcast.emit('newMessage', generateMessage('Server', 'New user has joined the chat.'));
+        socket.join(params.room);
+        socket.emit('newMessage', generateMessage('Server', 'Welcome to the chat app.'));
+        socket.broadcast.to(params.room).emit('newMessage', generateMessage('Server', `${params.name} has joined the room.`));
+    
+
+        callback();
+    });
 
     socket.on('createMessage', (message, callback) => {
         console.log('New Message:', message);
@@ -43,9 +53,8 @@ server.listen(port, () => {
 
 
 
-        //EMIT TO EVERYONE BUT YOURSELF
-        // socket.broadcast.emit('newMessage', {
-        //     from: message.from,
-        //     text: message.text,
-        //     createdAt: new Date().getTime()
-        // });
+//  io.emit -> emits to everyone
+//  io.to(room name) -> emits to everyone in that room..
+//  socket.broadcast.emit -> emits to everyone but person who sent request
+//  socket.broadcast.to(room name) -> emits to everyone but person who sent request IN ROOM
+//  socket.emit -> emits to one person
